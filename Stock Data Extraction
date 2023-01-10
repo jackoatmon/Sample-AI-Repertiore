@@ -1,0 +1,307 @@
+file_list = os.listdir(d_path + 'New Company Info')
+
+for each_file in file_list[:]:
+    ticker = each_file.split('.html')[0]
+    metric_source_path = d_path + 'New Company Info/' + each_file
+    backup_source_path = d_path + 'New Company Info Backup/' + each_file
+    ctype_path = d_path + 'New Company Types/' + each_file
+
+    try:
+        ctype_source = open(ctype_path, 'r').read()
+    except Exception as e:
+        ctype_source = ''
+        print(e, 'Ctype Source Error')
+
+    source = open(metric_source_path, 'r').read()
+
+    backup_exists = True
+    try:
+        backup_source = open(backup_source_path, 'r').read()
+    except Exception as e:
+        # print(e, 'No backup file')
+        backup_exists = False
+
+    print(ticker)
+
+    try:
+        if "We're sorry we weren't able to find anything about this topic" in source:
+            raise Exception('No data found on site')
+        else:
+            value_dict = {}
+            for each_data in gather:
+                value_dict[each_data] = None
+
+            error_types = []
+            no_matches = []
+            errors_exist = False
+
+            for each_data in gather:
+                try:
+                    def searching(string_pattern, to_search, datum):
+                        regex = re.escape('>' + datum) + string_pattern
+                        val = re.search(regex, to_search)
+                        val = str((val.group(1)))
+                        return val
+
+                    # Handling for incompletely split values
+                    def value_cleaning(val):
+                        val = str(val)
+                        if '>' in val:
+                            val = val.split('>')[-1]
+                        if ',' in val:
+                            val = val.replace(',', '')
+
+                        # Handling for letter abbreviations of large numbers
+                        if 'T' in val:
+                            val = float(val.replace('T', '')) * 1000000000000
+                        if 'B' in val:
+                            val = float(val.replace('B', '')) * 1000000000
+                        elif 'M' in val:
+                            val = float(val.replace('M', '')) * 1000000
+                        elif 'K' in val:
+                            val = float(val.replace('K', '')) * 1000
+
+                        if val == '-':
+                            val = np.nan
+                        return val
+
+                    string = r'.*?(\S*\d{1,8}(\.\d{1,8})?T?B?M?K?|N/A|0)%?(</span>)?</td></tr>'
+                    try:
+                        value = searching(string_pattern=string, to_search=source, datum=each_data)
+                        value = value_cleaning(val=value)
+                    except Exception as e:
+                        raise Exception(e)
+
+                    value_dict[each_data] = value
+                    # print('Value: ', value, ', Datum: ', each_data)  # , ', Datum Type: ', type(value))
+                except Exception as e:
+                    no_matches.append(each_data)
+                    error_types.append(str(e))
+                    value_dict[each_data] = np.nan
+                    errors_exist = True
+
+            second_noMatch = []
+            second_errorTypes = []
+            if errors_exist and backup_exists:
+                secondary_errors = False
+                for each_data in no_matches:
+                    value_exists = True
+
+                    # Handling for differences between sites in data-naming
+                    if each_data == 'Total Debt/Equity':
+                        alt_data_name = 'Total Debt to Equity'
+                    elif each_data == 'Trailing P/E':
+                        alt_data_name = 'P/E'
+                    elif each_data == 'Price/Sales':
+                        alt_data_name = 'P/S'
+                    elif each_data == 'Price/Book':
+                        alt_data_name = 'P/B'
+                    elif each_data == 'PEG Ratio':
+                        alt_data_name = 'PEG'
+                    elif each_data == 'Revenue':
+                        alt_data_name = 'Revenue (ttm)'
+                    elif each_data == 'Gross Profit':
+                        alt_data_name = 'Gross Margin'
+                    elif each_data == 'Net Income Avi to Common':
+                        alt_data_name = 'Net Profit'
+                    elif each_data in ['Enterprise Value/Revenue', 'Enterprise Value/EBITDA', 'Enterprise Value', 'EBITDA', 'Cash Flow']:
+                        value_exists = False
+                    else:
+                        alt_data_name = each_data
+
+                            if value_exists:
+                                # Secondary Search Start
+                                try:
+                                    string = r'.*?(\S*(\d{1,8}|\-)(\.\d{1,8})?T?B?M?K?|N/A|0)%?(</span>)?</b></td>'
+                                    value = searching(string_pattern=string, to_search=backup_source, datum=alt_data_name)
+                                    value = value_cleaning(val=value)
+                                except Exception as e:
+                                    second_noMatch.append(each_data)
+                                    second_errorTypes.append(str(e))
+                                    value = np.nan
+                                    secondary_errors = True
+
+                                value_dict[each_data] = value
+                        no_badData = True
+                        if any(indicator in backup_source for indicator in ['not found', 'no results', 'found in screener']):
+                            no_badData = False
+                            print('Bad backup')
+                        if secondary_errors and no_badData:
+                            print('Initial gathering errors for: ', no_matches, '\n', 'Error Types: ', np.unique(error_types), '\n',
+                                  'Secondary gathering error for: ', second_noMatch, '\n', 'Error Types: ', np.unique(second_errorTypes))
+                    try:
+                        ctype_regex = r'">(Healthcare|Basic Materials|Technology|Consumer Defensive|Industrials|Utilities|Consumer Cyclical|Financial Services|Real Estate|Energy|Communication Services)</span>'
+                        sector = re.search(ctype_regex, ctype_source).group(1)
+                        if sector == 'Healthcare':
+                            sector = 0
+                        elif sector == 'Basic Materials':
+                            sector = 1
+                        elif sector == 'Technology':
+                            sector = 2
+                        elif sector == 'Consumer Defensive':
+                            sector = 3
+                        elif sector == 'Industrials':
+                            sector = 4
+                        elif sector == 'Utilities':
+                            sector = 5
+                        elif sector == 'Consumer Cyclical':
+                            sector = 6
+                        elif sector == 'Financial Services':
+                            sector = 7
+                        elif sector == 'Real Estate':
+                            sector = 8
+                        elif sector == 'Energy':
+                            sector = 9
+                        elif sector == 'Communication Services':
+                            sector = 10
+                        else:
+                            sector = 11
+                    except Exception as e:
+                        sector = np.nan
+                        print(e, 'Sector Error')
+
+                    try:
+                        price_data = pd.DataFrame(yf.Ticker(ticker).history(start='2000-01-01', end=end_date))
+                        # print(price_data)
+
+                        if len(price_data) < 3:
+                            raise Exception('Ticker Delisted')
+
+                        p_avg_total = 0
+                        p_avg_periods = 0
+                        sp5_avg_total = 0
+                        sp5_avg_periods = 0
+                        current = price_data['Close'][-1]
+                        newdate = price_data.iloc[[-1]]
+                        newdate = str(newdate.index.values[0])
+                        year = str(int(newdate[:4]) - 1)
+                        current_year = str(int(newdate[:4]))
+                        month = newdate[5:7]
+                        day = str(int(newdate[8:10]))
+                        current_date = datetime.datetime(int(current_year), int(month), int(day))
+                        sp5_current = sp5_index.loc[current_date, 'sp500']
+                        unix_time = (current_date - datetime.datetime(1970, 1, 1)).total_seconds()
+
+                        for m in range(10):
+                            try:
+                                day = str(int(newdate[8:10]) + m)
+                                sp5_prior_date = year + '-' + month + '-' + day
+                                prior_unix = time.mktime(datetime.datetime.strptime(sp5_prior_date, '%Y-%m-%d').timetuple())
+
+                                # Variable to test if you're indexing past the company's start date
+                                past_daterange = False
+                                for z in range(1, y_periods + 1):
+                                    if not past_daterange:
+                                        if z % 2 == 0:
+                                            unix = prior_unix + period_dict[str(z) + ' period']
+                                        else:
+                                            unix = prior_unix - period_dict[str(z) + ' period']
+
+                                        for y in range(7):
+                                            try:
+                                                p_avg_date = datetime.datetime.utcfromtimestamp(
+                                                    (unix - day_value * y)).strftime('%Y-%m-%d')
+                                                p_avg_val = price_data['Close'][p_avg_date]
+                                                sp5_avg_val = sp5_index.loc[p_avg_date, 'sp500']
+
+                                                if p_avg_val != 'nan' and not np.isnan(p_avg_val):
+                                                    p_avg_total += p_avg_val
+                                                    p_avg_periods += 1
+                                                else:
+                                                    pass
+                                                if sp5_avg_val != 'nan' and not np.isnan(sp5_avg_val):
+                                                    sp5_avg_total += sp5_avg_val
+                                                    sp5_avg_periods += 1
+                                                else:
+                                                    pass
+
+                                                break
+                                            except Exception as e:
+                                                if datetime.datetime.strptime(p_avg_date, '%Y-%m-%d') < price_data.index[0]:
+                                                    print('End of price range (Year Prior Calc Error)')
+                                                    past_daterange = True
+                                                    break
+                                                if y == 6:
+                                                    print(e, 'Year Prior Calc Error')
+                                if p_avg_total != 'nan' and not np.isnan(p_avg_total) and p_avg_total != 0:
+                                    prior = p_avg_total / p_avg_periods
+                                else:
+                                    prior = np.nan
+
+                                if sp5_avg_total != 'nan' and not np.isnan(sp5_avg_total) and sp5_avg_total != 0:
+                                    sp5_prior = sp5_avg_total / sp5_avg_periods
+                                else:
+                                    sp5_prior = np.nan
+
+                                break
+
+                            except Exception as e:
+                                if m == 9:
+                                    print(str(e), 'ass')
+
+                        try:
+                            stock_prior_total = 0
+                            period_total = 0
+                            recent_vals = 0
+                            recent_period_total = 0
+
+                            past_daterange = False
+                            for b in range(1, periods):
+                                avg_date = int(unix_time - period_dict[str(b) + ' period'])
+
+                                if avg_date > 953337600 and not past_daterange:
+                                    for r in range(10):
+                                        try:
+                                            stock_prior_avg_date = datetime.datetime.fromtimestamp(
+                                                avg_date + (r * day_value)).strftime('%Y-%m-%d')
+                                            value = price_data['Close'][stock_prior_avg_date]
+                                            if math.isnan(value):
+                                                pass
+                                            else:
+                                                stock_prior_total += value
+                                                period_total += 1
+                                            break
+                                        except Exception as e:
+                                            if datetime.datetime.strptime(stock_prior_avg_date, '%Y-%m-%d') < price_data.index[0]:
+                                                print('End of price range (prior average)')
+                                                past_daterange = True
+                                                break
+                                            if r == 9:
+                                                print(e, 'Prior Average Error')
+
+                            past_daterange = False
+                            for y in range(1, recent_periods):
+                                rec_date = int(unix_time - rec_period_dict[str(y) + ' period'])
+
+                                if avg_date > 953337600 and not past_daterange:
+                                    for z in range(10):
+                                        try:
+                                            stock_prior_rec_date = datetime.datetime.fromtimestamp(
+                                                rec_date + (z * day_value)).strftime('%Y-%m-%d')
+                                            value = price_data['Close'][stock_prior_rec_date]
+                                            if math.isnan(value):
+                                                pass
+                                            else:
+                                                recent_vals += value
+                                                recent_period_total += 1
+                                            break
+                                        except Exception as e:
+                                            if datetime.datetime.strptime(stock_prior_rec_date, '%Y-%m-%d') < price_data.index[0]:
+                                                print('End of price range (prior recent value)')
+                                                past_daterange = True
+                                                break
+                                            if z == 9:
+                                                print(e, 'Prior Recent Value Error')
+                        except Exception as e:
+                            print(e, 'avg calc error')
+
+                        stock_prior_far_avg = round((stock_prior_total / period_total), 2)
+                        stock_prior_recent = round((recent_vals / recent_period_total), 2)
+                        # stock_prior_avg = stock_prior_recent - stock_prior_far_avg
+                        year_prior_diff = round((current - prior) / prior * 100.0, 2)
+                        sp5_year_prior = round((sp5_current - sp5_prior) / sp5_prior * 100.0, 2)
+                        year_prior_outperformance = year_prior_diff - sp5_year_prior
+                    except Exception as e:
+                        print(str(e), 'price data gather error')
+                        year_prior_diff = np.nan
+                        year_prior_outperformance = np.nan
