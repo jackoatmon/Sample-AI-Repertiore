@@ -8,7 +8,7 @@ for each_file in file_list[:]:
 
     try:
         ctype_source = open(ctype_path, 'r').read()
-    except Exception as e:
+    except Exception as e: 
         ctype_source = ''
         print(e, 'Ctype Source Error')
 
