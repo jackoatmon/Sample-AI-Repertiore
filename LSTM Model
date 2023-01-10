@@ -1,0 +1,71 @@
+        def lstm_model():
+            '''Loading Saved Model or Creating New Model'''
+            load = False
+            gm_load_path = d_path + 'Saved Models/70% Month Ahead Graph'
+            gm_save_path = d_path + 'Saved Models/70% Month Ahead Graph 2.0'
+
+            if load:
+                model = load_model(gm_load_path, compile=True)
+            else:
+                callback = keras.callbacks.EarlyStopping(monitor='mse',
+                                                         patience=5,
+                                                         baseline=.00001,
+                                                         mode='max')  # tf.keras.callbacks.TensorBoard(log_dir = log_dir, histogram_freq = 1)
+
+                '''Model Hyper-parameters'''
+
+                metrics = ['mse', 'mae']
+                num_of_units = [200, 300, 400]
+                num_of_layers = [2, 3, 4]
+                learning_rates = [.01, .0001, .0001]
+                # cross_entropy = tf.nn.weighted_cross_entropy_with_logits()
+                loss = keras.losses.MeanSquaredError()
+                initial_bias = keras.initializers.Constant(float(np.log((1 / percent_distribution))))
+
+                '''Model and Model Eval'''
+                for lr in learning_rates:
+                    for num_layers in num_of_layers:
+                        for num_units in num_of_units:
+                            session_num = 0
+
+                            hp_acc_dic = {}
+
+                            batch_size = 128
+                            learning_rate = lr
+                            opt = keras.optimizers.Adam(learning_rate=learning_rate, beta_1=.9, beta_2=.99)
+                            layer1 = num_units
+                            num_layers = num_layers
+                            epochs = 20
+
+                            model = keras.Sequential(layers.Dense(1000, activation='relu'))
+
+                            for layer in range(num_layers):
+                                model.add(layers.Dense(layer1, activation='relu'))
+                                model.add(layers.Dropout(.1))
+
+                            output = model.add(layers.Dense(1, activation='sigmoid', bias_initializer=initial_bias))
+
+                            model.compile(optimizer=opt,
+                                          loss=loss,
+                                          metrics=metrics)
+
+                            model.fit(x=train_set[0],
+                                      y=train_set[1],
+                                      validation_data=val_set,
+                                      batch_size=batch_size,
+                                      epochs=epochs,
+                                      callbacks=[callback],
+                                      verbose=1)
+
+                            test_loss, t_positives, f_positives, t_negatives, f_negatives, precision, recall, test_accuracy = model.evaluate(
+                                test_set[0],
+                                test_set[1])
+
+                            hp_acc_dic[recall] = [lr, num_layers, num_units, 'metrics:', precision, test_accuracy]
+                            # print(lr, num_layers, num_units)
+                            # hp_acc_dic[[test_accuracy, t_positives, f_positives, t_negatives, f_negatives]] = [lr, num_units, num_layers]
+                            # print(model.summary())
+                            print('Accuracy:', test_accuracy * 100.00, '%')
+
+                            if not load:
+                                save_model(model, gm_save_path)   
