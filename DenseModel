@@ -1,0 +1,71 @@
+callback = keras.callbacks.EarlyStopping(monitor='val_accuracy',
+                                                         patience=5,
+                                                         baseline=.00001,
+                                                         mode='max')
+
+                '''Model Hyper-parameters'''
+
+                metrics = [keras.metrics.TruePositives(name='tp'),
+                           keras.metrics.FalsePositives(name='fp'),
+                           keras.metrics.TrueNegatives(name='tn'),
+                           keras.metrics.FalseNegatives(name='fn'),
+                           keras.metrics.Precision(name='precision'),
+                           keras.metrics.Recall(name='recall'),
+                           keras.metrics.BinaryAccuracy(name='accuracy')]
+
+                loss = keras.losses.BinaryCrossentropy()
+                initial_bias = keras.initializers.Constant(float(np.log((1 / percent_distribution))))
+
+                '''Model and Model Eval'''
+                batch_size = 128
+                learning_rate = .0001
+                num_layers = 7
+                epochs = 10
+                opt = keras.optimizers.Adam(learning_rate=learning_rate, beta_1=.9, beta_2=.99)
+                if timeframe == 'Week':
+                    if how_much_better == 22:
+                        layer_size = 400
+                    if how_much_better == 30:
+                        layer_size = 250
+                    if how_much_better == 40:
+                        layer_size = 200
+                    if how_much_better == 50:
+                        layer_size = 150
+                        epochs = 5
+                    if how_much_better == 60:
+                        layer_size = 125
+                        epochs = 5
+                if timeframe == 'Month':
+                    if how_much_better == 50:
+                        layer_size = 600
+                    if how_much_better == 70:
+                        layer_size = 450
+                    if how_much_better == 90:
+                        layer_size = 375
+                        epochs = 10
+                    if how_much_better == 120:
+                        layer_size = 300
+                        epochs = 10
+
+                model = keras.Sequential(tf.keras.layers.Dense(len(features), activation='relu'))
+
+                for layer in range(num_layers):
+                    model.add(keras.layers.Dense(layer_size, activation='relu'))
+
+                output = model.add(keras.layers.Dense(1, activation='sigmoid', bias_initializer=initial_bias))
+
+                model.compile(optimizer=opt,
+                              loss=loss,
+                              metrics=metrics)
+
+                model.fit(x=train_set[0],
+                          y=train_set[1],
+                          validation_data=val_set,
+                          batch_size=batch_size,
+                          epochs=epochs,
+                          callbacks=[callback],
+                          verbose=1)
+
+                test_loss, t_positives, f_positives, t_negatives, f_negatives, precision, recall, test_accuracy = model.evaluate(
+                    test_set[0],
+                    test_set[1])
