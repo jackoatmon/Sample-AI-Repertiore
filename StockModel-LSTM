@@ -37,7 +37,7 @@
                             num_layers = num_layers
                             epochs = 20
 
-                            model = keras.Sequential(layers.Dense(1000, activation='relu'))
+                            model = keras.Sequential(layers.Dense(512, activation='relu'))
 
                             for layer in range(num_layers):
                                 model.add(layers.Dense(layer1, activation='relu'))
