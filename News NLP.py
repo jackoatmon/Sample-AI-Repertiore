@@ -4,7 +4,7 @@ from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM, Trainer
 from datasets import Dataset, load_metric
 import datetime
 
-api_key = '682be6864fe5485bbdd773141bcae908'
+api_key = 'XXXXXXXXXXXXXXXXXXXXXXXXXX'
 
 decision = 'train'  # "train" or "process" to decide if new model or analyzing new articles
 
